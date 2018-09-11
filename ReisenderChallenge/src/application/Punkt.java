@@ -1,9 +1,11 @@
 package application;
 
+import org.apache.commons.math3.ml.clustering.Clusterable;
+
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 
-public class Punkt {
+public class Punkt implements Clusterable {
 	private int x;
 	private int y;
 	private boolean flag;
@@ -68,5 +70,11 @@ public class Punkt {
 		double durchmesser = 6;
 		gc.setFill(Color.GRAY);
 		gc.fillOval(x-durchmesser/2, y-durchmesser/2, durchmesser, durchmesser);		
+	}
+
+	@Override
+	public double[] getPoint() {
+		double []point = {x, y};
+		return point;
 	}
 }

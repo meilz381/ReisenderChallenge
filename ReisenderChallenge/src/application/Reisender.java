@@ -1,8 +1,22 @@
 package application;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.Random;
+import java.util.TreeMap;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.DoubleStream;
+
+import org.apache.commons.math3.linear.RealMatrix;
+import org.apache.commons.math3.linear.RealVector;
+import org.apache.commons.math3.ml.clustering.Clusterable;
+import org.apache.commons.math3.ml.clustering.FuzzyKMeansClusterer;
+import org.apache.commons.math3.ml.distance.EuclideanDistance;
+
 import javafx.scene.canvas.GraphicsContext;
 
 public class Reisender {
@@ -29,6 +43,39 @@ public class Reisender {
 			lange += points.get(i).distanzZu(points.get(i + 1));
 		}
 		return lange;
+	}
+	
+	// Verbesserungsheuristiken
+	
+	public LinkedList<Punkt> linKernighan(LinkedList<Punkt> punktRoute) {
+		//Weg T
+		LinkedList<Linie> ausgangsroute = convertToRoute(punktRoute);
+		
+		// backtrackingtiefe
+		int p1 = 4;
+		// unzulässigkeitstiefe
+		int p2 = 6;
+		
+		for (int i = 0; i < 0; i++) {
+			// wähle einen Knoten v1
+			Punkt v1 = stadte.get(i);
+			
+			// wähle eine Kante x1 = [v1, v2]
+			Linie x1;
+			for (Linie l : ausgangsroute) {
+				if (l.getStart() == v1) {
+					x1 = l;
+					break;
+				}
+			}
+			
+			// wähle eine Kante y1 = [v2, v3] die nicht in T enthalten ist, so das D1 > 0
+			
+			
+		}
+		
+		
+		return null;
 	}
 	
 	public LinkedList<Punkt> two_opt(LinkedList<Punkt> route, int maxOpt) {
@@ -248,8 +295,6 @@ public class Reisender {
 										subRoute.addAll(subRouteD);
 									else
 										subRoute.addAll(reverseLinkedList(subRouteD));
-									
-									
 								}
 							}
 						}	
@@ -279,6 +324,7 @@ public class Reisender {
 	}
 	
 	
+	// Eröffnungsverfahren
 	public LinkedList<Punkt> NHH(){
 		LinkedList<Punkt> bestRoute = stadte;
 		double bestRouteLange = langeDerRoutePoints(stadte);
@@ -441,10 +487,291 @@ public class Reisender {
 		}
 		return besteRoute;
 	}
+	
+	public LinkedList<Punkt> fcmGSPO(int iterations) {
+		int clusters = 5;
+		LinkedList<Punkt> route = stadte;;
+		if (stadte.size() > 200) {
+			// city clustering
+			ArrayList<LinkedList<Punkt>> cityCluster = cityClustering(clusters);
+			
+			// generate tour path for each subcluster
+			for (LinkedList<Punkt> cluster : cityCluster) {
+				cluster = generateInitialTourPath(cluster);
+				cluster = two_opt(cluster, 5);
+			}
+			
+			// merge of subcluster tour paths
+			route = new LinkedList<>(cityCluster.get(0));
+			for (int i = 1; i < clusters; i++) {
+				ArrayList<Linie> verbindungen = new ArrayList<>();
+				for (Punkt p1 : route) {
+					for (Punkt p2 : cityCluster.get(i)) {
+						verbindungen.add(new Linie(p1, p2));
+					}
+				}
+				Collections.sort(verbindungen);
+				Linie verbindung1 = verbindungen.get(0);
+				int insertionPoint1 = route.indexOf(verbindung1.getStart());
+				int insertionPoint2 = cityCluster.get(i).indexOf(verbindung1.getEnde());
+				for (int j = 0; j < cityCluster.get(i).size(); j++) {
+					route.add(insertionPoint1 +1, cityCluster.get(i).get((insertionPoint2 + j) % cityCluster.get(i).size()));
+				}
+			}
+		}
+		route = GPSO(iterations, route);
+		
+		return route;
+	}
+	
+	private ArrayList<LinkedList<Punkt>> cityClustering(int clusters){
+		EuclideanDistance distanceMeasure = new EuclideanDistance();
+		FuzzyKMeansClusterer<Clusterable> fuzzyKMeansClusterer;
+		fuzzyKMeansClusterer = new FuzzyKMeansClusterer<>(clusters, 1.2, 5000, distanceMeasure);
+		Collection<Clusterable> test = new ArrayList<>(stadte);
+		fuzzyKMeansClusterer.cluster(test);
+		
+		RealMatrix membershipMatrix = fuzzyKMeansClusterer.getMembershipMatrix();
+		// crisp clustering
+		ArrayList<LinkedList<Punkt>> cityClusters = new ArrayList<>();
+		for (int i = 0; i < clusters; i++) {
+			cityClusters.add(new LinkedList<>());
+		}
+		for (int i = 0; i < stadte.size(); i++) {
+			RealVector membershipVektor = membershipMatrix.getRowVector(i);
+			cityClusters.get(membershipVektor.getMaxIndex()).add(stadte.get(i));
+		}
+		
+		return cityClusters;
+	}
+	
+	
+	private LinkedList<Punkt> convertToPunktRoute(double[] positionVektor) {
+		ArrayIndexComparator comparator = new ArrayIndexComparator(positionVektor);
+		Integer[] indexes = comparator.createIndexArray();
+		Arrays.sort(indexes, comparator);
+		LinkedList<Punkt> routePartikel = new LinkedList<>();
+		for (int k = 0; k < stadte.size(); k++) {
+			routePartikel.add(stadte.get(indexes[k]));
+		}
+		return routePartikel;
+	}
+	
+	private LinkedList<Punkt> generateInitialTourPath(LinkedList<Punkt> cityCluster) {
+		// calculate the geographical center
+		double centerX = 0;
+		double centerY = 0;
+		for (int i = 0; i < cityCluster.size(); i++) {
+			centerX += cityCluster.get(i).getX();
+			centerY += cityCluster.get(i).getY();
+		}
+		centerX /= cityCluster.size();
+		centerY /= cityCluster.size();
+		
+		// calculate orientation angle of city to the geographical center
+		Map<Double, Punkt> punktOrientationAngleMap = new TreeMap<Double, Punkt>();
+		
+		for (int i = 0; i < stadte.size(); i++) {
+			punktOrientationAngleMap.put(180/Math.PI * Math.atan((stadte.get(i).getY() - centerY) / (stadte.get(i).getX() - centerX)), stadte.get(i));
+		}
+		
+		// generate a tour path according to the orientation angle value
+		LinkedList<Punkt> route = new LinkedList<>();
+		for(Punkt p : punktOrientationAngleMap.values()) {
+			route.add(p);
+		}
+		
+		return stadte;	
+	}
 
+	public LinkedList<Punkt> GPSO(int iterations, LinkedList<Punkt> startRoute) {
+		
+		int countCrossover = 50;
+		int countMutation = 30;
+		
+		int countPartikel = 100;
+		
+		double[] bestFoundVector = new double[stadte.size()];
+		/*for (int i = 0; i < stadte.size(); i++) {
+			bestFoundVector[i] = Math.random();
+		}
+		*/
+		for (int i = 0; i < startRoute.size(); i++) {
+			bestFoundVector[stadte.indexOf(startRoute.get(i))] = 1 / Math.sqrt(i + 1);
+		}
+		
+		
+		LinkedList<Punkt> bestFoundRoute = convertToPunktRoute(bestFoundVector);
+		double bestFountVectorFitness = 1 / langeDerRoutePoints(bestFoundRoute);
+		
+		Random r = new Random();
+		
+		ArrayList<Partikel> partikel = new ArrayList<>();
+		for (int i = 0 ; i < countPartikel; i++) {
+			partikel.add(new Partikel(stadte.size()));
+		}
+		
+		
+		for (int i = 0; i < iterations; i++) {
+			
+			ArrayList<Partikel> partikelNewGeneration = new ArrayList<>(partikel);
+			
+			//// evaluate individuals based on fitness function
+			for (int j = 0; j < countPartikel; j++) {
+				Partikel partikelchen = partikel.get(j);
+				double[] positionVectorPartikel = partikelchen.getPositionVector();
+				//generate Route
+				LinkedList<Punkt> routePartikel = convertToPunktRoute(positionVectorPartikel);
+				partikelchen.setRoute(routePartikel);
+				partikelchen.setFitness(1 / langeDerRoutePoints(routePartikel));
+			}
+			
+			
+			//// Selection Scheme --- linear ranking
+			// sort by fitness
+			double[] fitnessPartikel = new double[countPartikel];
+			for (int j = 0; j < countPartikel; j++) {
+				fitnessPartikel[j] = partikel.get(j).getFitness();
+			}
+			ArrayIndexComparator comparator = new ArrayIndexComparator(fitnessPartikel);
+			Integer[] indexes = comparator.createIndexArray();
+			Arrays.sort(indexes, comparator);
+			//Arrays.sort(indexes, Collections.reverseOrder());
+			
+			double minFitness = partikel.get(indexes[countPartikel - 1]).getFitness();
+			double maxFitness = partikel.get(indexes[0]).getFitness();
+			double[] selectionProbability = new double[countPartikel];
+			for (int j = 0; j < countPartikel; j++) {
+				selectionProbability[j] = 1/countPartikel * (maxFitness - (j) * (maxFitness - minFitness) / (countPartikel));
+			}
+			
+			
+			double totalFitness = DoubleStream.of(fitnessPartikel).sum();
+			double[] relativeFitness = new double[countPartikel];
+			double sum = 0;
+			for (int j = 0; j < countPartikel; j++) {
+				sum += selectionProbability[j];
+				relativeFitness[j] = sum;
+			}
+			
+			//// Recombination
+			
+			TreeMap<Double, Partikel> selectionPropabilityPartikelMap = new TreeMap<>();
+			for (int j = 0; j < countPartikel; j++) {
+				selectionPropabilityPartikelMap.put(relativeFitness[j], partikel.get(indexes[j]));
+			}
+			
+			double[] randomNumbers = ThreadLocalRandom.current().doubles(0, totalFitness).distinct().limit(countCrossover * 2).toArray();
+			
+			// wähle die Chromosomen
+			for (int j = 0; j < countCrossover; j++) {
+				Partikel partikel1, partikel2;
+				// Individuen
+				Map.Entry<Double, Partikel> p1Low = selectionPropabilityPartikelMap.floorEntry(randomNumbers[j]);
+				Map.Entry<Double, Partikel> p1High = selectionPropabilityPartikelMap.ceilingEntry(randomNumbers[j]);
+				Map.Entry<Double, Partikel> p2Low = selectionPropabilityPartikelMap.floorEntry(randomNumbers[j + 1]);
+				Map.Entry<Double, Partikel> p2High = selectionPropabilityPartikelMap.ceilingEntry(randomNumbers[j + 1]);
+				partikel1 = (p1Low == null) ? p1High.getValue() : p1Low.getValue();
+				partikel2 = (p2Low == null) ? p2High.getValue() : p2Low.getValue();
+				
+				double[] partikel1PositionVector = partikel1.getPositionVector().clone();
+				double[] partikel2PositionVector = partikel2.getPositionVector().clone();
+				
+				int crossOverPoint = r.nextInt(stadte.size());
+				double[] copyPartikel1PositionVector = partikel1.getPositionVector().clone();
+				for (int k = crossOverPoint; k < stadte.size(); k++) {
+					partikel1PositionVector[k] = partikel2PositionVector[k];
+					partikel2PositionVector[k] = copyPartikel1PositionVector[k];
+				}
+				
+				partikelNewGeneration.add(new Partikel(partikel1PositionVector, stadte.size()));
+				partikelNewGeneration.add(new Partikel(partikel2PositionVector, stadte.size()));
+			}
+			
+			// Mutation
+			for (int j = 0; j < countMutation; j++) {
+				int randomNumberChoosePartikel = r.nextInt(partikelNewGeneration.size());
+				double[] partikelPositionVectorMutation = new double[stadte.size()];
+				partikelPositionVectorMutation = partikelNewGeneration.get(randomNumberChoosePartikel).getPositionVector();
+				
+				int randomNumberMutatePartikel = r.nextInt(stadte.size());
+				partikelPositionVectorMutation[randomNumberMutatePartikel] = Math.random();
+				partikelNewGeneration.add(new Partikel(partikelPositionVectorMutation, stadte.size()));
+				
+			}
+			
+			// evalutate fitness again
+			for (int j = 0; j < partikelNewGeneration.size(); j++) {
+				Partikel partikelchen = partikelNewGeneration.get(j);
+				double[] positionVectorPartikel = partikelchen.getPositionVector();
+				//generate Route
+				LinkedList<Punkt> routePartikel = convertToPunktRoute(positionVectorPartikel);
+				partikelchen.setRoute(routePartikel);
+				partikelchen.setFitness(1 / langeDerRoutePoints(routePartikel));
+			}
+			
+			// sort by fitness
+			double[] fitnessPartikel2 = new double[partikelNewGeneration.size()];
+			for (int j = 0; j < partikelNewGeneration.size(); j++) {
+				fitnessPartikel2[j] = partikelNewGeneration.get(j).getFitness();
+			}
+			ArrayIndexComparator comparator2 = new ArrayIndexComparator(fitnessPartikel2);
+			Integer[] indexes2 = comparator2.createIndexArray();
+			Arrays.sort(indexes2, comparator2);
+			//Arrays.sort(indexes2, Collections.reverseOrder());
+			
+			maxFitness = partikelNewGeneration.get(indexes2[0]).getFitness();
+			
+			if (maxFitness < bestFountVectorFitness) {
+				bestFountVectorFitness = maxFitness;
+				bestFoundRoute = partikel.get(indexes[countPartikel - 1]).getRoute();
+				bestFoundVector = partikel.get(indexes[countPartikel - 1]).getPositionVector();
+			}
+			bestFoundVector = partikel.get(indexes[0]).getPositionVector();
+			
+			// replace parent population, delete n last
+			int nLast = countCrossover + countMutation;
+			ArrayList<Partikel> removeList = new ArrayList<>();
+			for (int j = 0; j < nLast; j++) {
+				removeList.add(partikelNewGeneration.get(indexes2[nLast - 1 - j]));
+			}
+			partikelNewGeneration.removeAll(removeList);
+			
+			//// update Partikel
+			//update position vektor
+			for (int j = 0; j < partikelNewGeneration.size(); j++) {
+				partikelNewGeneration.get(j).updateVectors(bestFoundVector);
+			}
+		}
+		return bestFoundRoute;
+	}
+	
+	
+	
+	
 
 	public LinkedList<Linie> berechneRoute(long startzeit)
 	{
+		/*// genetische algorithmen
+		int iterations = 0;
+		
+		if (stadte.size() == 16) {
+			iterations = 100;
+		}
+		else if (stadte.size() == 40) {
+			iterations = 100;
+		}
+		else {
+			iterations = 50;
+		}
+		LinkedList<Punkt> gpso = fcmGSPO(iterations);
+		gpso = two_opt(gpso, 5);
+		gpso = three_opt(gpso, 5);
+		gpso = four_opt(gpso, 1);
+		LinkedList<Linie> gspoRoute = convertToRoute(gpso);*/
+		
+		
+		
 		////Klassische Algorithmen
 		
 		LinkedList<Punkt> dnnh = DNHH();
@@ -456,7 +783,7 @@ public class Reisender {
 		else {
 			dnnh = two_opt(dnnh, 5);
 			dnnh = three_opt(dnnh, 5);
-			//dnnh = four_opt(dnnh, 1);
+//			dnnh = four_opt(dnnh, 1);
 		}
 		LinkedList<Linie> dnnhRoute = convertToRoute(dnnh);
 		
@@ -465,7 +792,7 @@ public class Reisender {
 		if (stadte.size() < 200) {
 			nhh = two_opt(nhh, 5);
 			nhh = three_opt(nhh, 5);
-			nhh = four_opt(nhh, 1);
+//			nhh = four_opt(nhh, 1);
 		}
 		else {
 			nhh = two_opt(nhh, 5);
@@ -482,13 +809,9 @@ public class Reisender {
 			multiFrag = multiFragment();
 			multiFrag = two_opt(multiFrag, 5);
 			multiFrag = three_opt(multiFrag, 5);
-			multiFrag = four_opt(multiFrag, 1);
+//			multiFrag = four_opt(multiFrag, 1);
 			multiFragRoute = convertToRoute(multiFrag);
 		}
-		
-		
-		//38.21 -s90
-		//38.94 -s0
 		
 		//s90
 		//38.5599
@@ -499,6 +822,7 @@ public class Reisender {
 		ArrayList<Double> lange = new ArrayList<>();
 		lange.add(langeDerRoutePoints(nhh));
 		lange.add(langeDerRoutePoints(dnnh));
+//		lange.add(langeDerRoutePoints(gpso));
 		if (stadte.size() < 200)
 			lange.add(langeDerRoutePoints(multiFrag));
 		int indexMinLange = lange.indexOf(Collections.min(lange));
@@ -508,12 +832,13 @@ public class Reisender {
 		else if (indexMinLange == 1) {
 			return dnnhRoute;
 		}
-		else if (indexMinLange == 2){
+		else if (indexMinLange == 2) {
 			return multiFragRoute;
 		}
 		else {
 			return null;
 		}
+		
 	}
 
 	// nur zur Hilfe :)
