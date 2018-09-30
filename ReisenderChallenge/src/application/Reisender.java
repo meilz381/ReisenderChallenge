@@ -35,37 +35,6 @@ public class Reisender {
 	
 	// Verbesserungsheuristiken
 	
-	public LinkedList<Punkt> linKernighan(LinkedList<Punkt> punktRoute) {
-		//Weg T
-		LinkedList<Linie> ausgangsroute = convertToRoute(punktRoute);
-		
-		// backtrackingtiefe
-		int p1 = 4;
-		// unzulässigkeitstiefe
-		int p2 = 6;
-		
-		for (int i = 0; i < 0; i++) {
-			// wähle einen Knoten v1
-			Punkt v1 = stadte.get(i);
-			
-			// wähle eine Kante x1 = [v1, v2]
-			Linie x1;
-			for (Linie l : ausgangsroute) {
-				if (l.getStart() == v1) {
-					x1 = l;
-					break;
-				}
-			}
-			
-			// wähle eine Kante y1 = [v2, v3] die nicht in T enthalten ist, so das D1 > 0
-			
-			
-		}
-		
-		
-		return null;
-	}
-	
 	public LinkedList<Punkt> two_opt(LinkedList<Punkt> route, int maxOpt) {
 		boolean change = true;
 		while (maxOpt > 0 && change) {
@@ -204,59 +173,12 @@ public class Reisender {
 			
 		return route;
 	}
+
 	
-	/*public LinkedList<Punkt> three_opt(LinkedList<Punkt> route, int maxOpt) {
-		LinkedList<Punkt> besteRoute = new LinkedList<>(route);
-		boolean change = true;
-		while (maxOpt > 0 && change) {
-			change = false;
-			for (int i = 1; i < besteRoute.size(); i++) {
-				for (int j = i + 1; j < besteRoute.size(); j++) {
-					double bestLange = langeDerRoutePoints(besteRoute);
-					LinkedList<Punkt> subRouteA = new LinkedList<>(besteRoute.subList(0, i));
-					LinkedList<Punkt> subRouteB = new LinkedList<>(besteRoute.subList(i, j));
-					LinkedList<Punkt> subRouteC = new LinkedList<>(besteRoute.subList(j, besteRoute.size()));
-					
-					
-					ArrayList<LinkedList<Punkt>> subRouteList = new ArrayList<>();
-					for (int x = 0; x < 2; x++) {
-						for (int y = 0; y < 2; y++) {
-								LinkedList<Punkt> subRoute = new LinkedList<>(subRouteA);
-								if (x == 0)
-									subRoute.addAll(subRouteB);
-								else
-									subRoute.addAll(reverseLinkedList(subRouteB));
-								if (y == 0)
-									subRoute.addAll(subRouteC);
-								else
-									subRoute.addAll(reverseLinkedList(subRouteB));
-						}
-					}	
-					
-					LinkedList<Punkt> nextRoute = new LinkedList<>(besteRoute);
-					
-					for (LinkedList<Punkt> potSubroute: subRouteList) {	
-						if (langeDerRoutePoints(potSubroute) < bestLange) {
-							nextRoute = potSubroute;
-							bestLange = langeDerRoutePoints(potSubroute);
-						}
-					}
-					
-					besteRoute = nextRoute;
-				}
-			}
-			maxOpt--;	
-		}
-		return besteRoute;
-	}
-	*/
-	
-	public LinkedList<Punkt> four_opt(LinkedList<Punkt> route, int maxOpt) {
-		LinkedList<Punkt> besteRoute = new LinkedList<>(route);
-		boolean change = true;
-		while (maxOpt > 0 && change) {
-			change = false;
-			for (int i = 1; i < besteRoute.size(); i++) {
+	public LinkedList<Punkt> four_opt(LinkedList<Punkt> pfad, long startzeit) {
+		LinkedList<Punkt> besteRoute = new LinkedList<>(pfad);
+		for (int i = 1; i < besteRoute.size(); i++) {
+			if (verbleibendeZeit(startzeit) > 25000) {
 				for (int j = i + 1; j < besteRoute.size(); j++) {
 					for (int k = j + 1; k < besteRoute.size(); k++) {
 						double bestLange = langeDerRoutePoints(besteRoute);
@@ -266,33 +188,45 @@ public class Reisender {
 						LinkedList<Punkt> subRouteD = new LinkedList<>(besteRoute.subList(k, besteRoute.size()));
 						
 						
-						LinkedList<LinkedList<Punkt>> subRouteList = new LinkedList<>();
+						LinkedList<LinkedList<Punkt>> potListen = new LinkedList<LinkedList<Punkt>>();
+						
 						for (int x = 0; x < 2; x++) {
 							for (int y = 0; y < 2; y++) {
 								for (int z = 0; z < 2; z++) {
-									LinkedList<Punkt> subRoute = new LinkedList<>(subRouteA);
-									if (x == 0)
-										subRoute.addAll(subRouteB);
-									else
-										subRoute.addAll(reverseLinkedList(subRouteB));
-									if (y == 0)
-										subRoute.addAll(subRouteC);
-									else
-										subRoute.addAll(reverseLinkedList(subRouteB));
-									if (z == 0)
-										subRoute.addAll(subRouteD);
-									else
-										subRoute.addAll(reverseLinkedList(subRouteD));
+										LinkedList<Punkt> gesRoute1 = new LinkedList<Punkt>(subRouteA);
+										LinkedList<Punkt> gesRoute2 = new LinkedList<Punkt>(subRouteA);
+	
+										LinkedList<Punkt> subRoute = new LinkedList<Punkt>();
+										if (x == 0)
+											subRoute.addAll(subRouteB);
+										else
+											subRoute.addAll(reverseLinkedList(subRouteB));
+										if (y == 0)
+											subRoute.addAll(subRouteC);
+										else
+											subRoute.addAll(reverseLinkedList(subRouteC));
+										if (z == 0)
+											subRoute.addAll(subRouteD);
+										else
+											subRoute.addAll(reverseLinkedList(subRouteD));
+											
+										
+										gesRoute1.addAll(subRoute);
+										gesRoute2.addAll(reverseLinkedList(subRoute));
+										potListen.add(gesRoute1);
+										if (!potListen.contains(gesRoute2)) {
+											potListen.add(gesRoute2);
+										}								
 								}
 							}
-						}	
-						
+						}
+					
 						LinkedList<Punkt> nextRoute = new LinkedList<>(besteRoute);
 						
-						for (LinkedList<Punkt> potSubroute: subRouteList) {	
-							if (langeDerRoutePoints(potSubroute) < bestLange) {
-								nextRoute = potSubroute;
-								bestLange = langeDerRoutePoints(potSubroute);
+						for (LinkedList<Punkt> potRoute: potListen) {	
+							if (langeDerRoutePoints(potRoute) < bestLange) {
+								nextRoute = potRoute;
+								bestLange = langeDerRoutePoints(potRoute);
 							}
 						}
 						
@@ -300,10 +234,10 @@ public class Reisender {
 					}
 				}
 			}
-			maxOpt--;
-		}
+		}	
 		return besteRoute;
-	}	
+	}
+	
 	
 	/*public LinkedList<Punkt> improvePath(LinkedList<Punkt> route, int depth, ArrayList<Punkt> restrictedVertices) {
 		// rekursionsdetph
@@ -540,34 +474,27 @@ public class Reisender {
 
 	public LinkedList<Linie> berechneRoute(long startzeit)
 	{
-		
-		
-		////Klassische Algorithmen
-		
+		//dnhh
 		LinkedList<Punkt> dnnh = DNHH();
 		if (stadte.size() < 200) {
 			dnnh = two_opt(dnnh, 5);
 			dnnh = three_opt(dnnh, 5);
-//			dnnh = four_opt(dnnh, 1);
 		}
 		else {
 			dnnh = two_opt(dnnh, 5);
 			dnnh = three_opt(dnnh, 5);
-//			dnnh = four_opt(dnnh, 1);
 		}
 		LinkedList<Linie> dnnhRoute = convertToRoute(dnnh);
 		
-		//NNH
+		//NHH
 		LinkedList<Punkt> nhh = NHH();
 		if (stadte.size() < 200) {
 			nhh = two_opt(nhh, 5);
 			nhh = three_opt(nhh, 5);
-//			nhh = four_opt(nhh, 1);
 		}
 		else {
 			nhh = two_opt(nhh, 5);
 			nhh = three_opt(nhh, 5);
-//			nhh = four_opt(nhh, 1);
 		}
 		LinkedList<Linie> nhhRoute = convertToRoute(nhh);
 		
@@ -579,20 +506,12 @@ public class Reisender {
 			multiFrag = multiFragment();
 			multiFrag = two_opt(multiFrag, 5);
 			multiFrag = three_opt(multiFrag, 5);
-//			multiFrag = four_opt(multiFrag, 1);
 			multiFragRoute = convertToRoute(multiFrag);
 		}
 		
-		//s90
-		//38.56
-		//28.5888 + 9.971
-		//s0
-		//39.5077
-		//29,5027 + 10.005
 		ArrayList<Double> lange = new ArrayList<>();
 		lange.add(langeDerRoutePoints(nhh));
 		lange.add(langeDerRoutePoints(dnnh));
-//		lange.add(langeDerRoutePoints(gpso));
 		if (stadte.size() < 200)
 			lange.add(langeDerRoutePoints(multiFrag));
 		int indexMinLange = lange.indexOf(Collections.min(lange));
@@ -608,7 +527,6 @@ public class Reisender {
 		else {
 			return null;
 		}
-		
 	}
 
 	// nur zur Hilfe :)
