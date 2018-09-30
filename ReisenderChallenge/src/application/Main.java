@@ -5,23 +5,23 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.LinkedList;
 import java.util.Random;
-
 import javafx.application.Application;
-import javafx.fxml.FXMLLoader;
+import javafx.stage.Stage;
 import javafx.scene.Scene;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Label;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
-import javafx.stage.Stage;
+import javafx.fxml.FXMLLoader;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Label;
 
 
 public class Main extends Application {
 	private int breite = 700;
 	private int hohe = breite;
 	private boolean zeigeTeilScore = false;
+	private static int startSeed = 90;
 	
 	@Override
 	public void start(Stage primaryStage) {		
@@ -37,11 +37,10 @@ public class Main extends Application {
 			primaryStage.show();
 
 			// alles Nötige generieren
-			int startSeed = 90;
 			System.out.print("Erstelle Seeds ... ");
 			long[] seeds = seedGenerator(startSeed, 10);
 			/* tests mit:
-			 * 16 Stäte (6 tests)
+			 * 16 Städte (6 tests)
 			 * 40 Städte (3 test)
 			 * 209 Städte (1 test)
 			 */
@@ -111,6 +110,8 @@ public class Main extends Application {
 	
 	public static void main(String[] args)
 	{		
+		if (args.length > 0)
+			startSeed = Integer.parseInt(args[0]);
 		launch(args);
 	}
 	
