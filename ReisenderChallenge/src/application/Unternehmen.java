@@ -6,9 +6,9 @@ import java.util.LinkedList;
 
 public class Unternehmen {
 	
-	double langeBesteRoute;
+	private double langeBesteRoute;
 	
-	LinkedList<Punkt> besteRoute;
+	private LinkedList<Punkt> besteRoute;
 	
 	
 
